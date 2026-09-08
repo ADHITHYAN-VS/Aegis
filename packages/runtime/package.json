@@ -1,0 +1,21 @@
+{
+  "name": "@aegis/runtime",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm,cjs,iife --global-name AegisRuntime --dts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aegis/core": "workspace:*"
+  }
+}

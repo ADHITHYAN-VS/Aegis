@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Aegis Web-DRM Vanilla Demo</title>
+  <script src="../../packages/runtime/dist/index.global.js"></script>
+</head>
+<body>
+  <div id="aegis-root">
+    <h1>Aegis Web-DRM Protected Page</h1>
+    <p>Status: <span id="status">Initializing...</span></p>
+    <p>Result: <span id="result">-</span></p>
+  </div>
+
+  <script>
+    async function init() {
+      const { AegisLoader } = window.AegisRuntime;
+      const loader = new AegisLoader();
+      loader.startSentinel();
+
+      // Simple pre-compiled sample bundle
+      const sampleBundle = {
+        version: "1.0.0",
+        buildSeed: "demo-seed",
+        opcodeMap: {
+          NOP: 0, PUSH: 1, POP: 2, ADD: 3, SUB: 4, CALL: 5, RET: 6, JMP: 7, JE: 8, LOAD: 9, STORE: 10, HALT: 255
+        },
+        instructions: [
+          { opcode: 1, arg: 40 },
+          { opcode: 1, arg: 2 },
+          { opcode: 3 },
+          { opcode: 255 }
+        ],
+        constants: []
+      };
+
+      try {
+        const res = await loader.loadAndExecute(sampleBundle, "demo-seed");
+        document.getElementById('status').innerText = 'Executed Securely in VM';
+        document.getElementById('result').innerText = res;
+      } catch (err) {
+        document.getElementById('status').innerText = 'Execution Failed (Tampered)';
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

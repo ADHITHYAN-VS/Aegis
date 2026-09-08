@@ -1,0 +1,9 @@
+{
+  "name": "aegis-react-demo",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "@aegis/runtime": "workspace:*"
+  }
+}
