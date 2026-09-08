@@ -24,6 +24,14 @@ importers:
         specifier: ^1.3.1
         version: 1.6.1(@types/node@26.5.0)(happy-dom@13.10.1)
 
+  examples/react-demo:
+    dependencies:
+      '@aegis/runtime':
+        specifier: workspace:*
+        version: link:../../packages/runtime
+
+  examples/vanilla-demo: {}
+
   packages/compiler:
     dependencies:
       '@aegis/core':
