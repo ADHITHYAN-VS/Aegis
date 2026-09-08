@@ -1,3 +1,4 @@
+import { AegisPolicy } from '@aegis/core';
 import { AdaptiveResponder } from './responder.js';
 
 /**
@@ -5,10 +6,12 @@ import { AdaptiveResponder } from './responder.js';
  */
 export class Sentinel {
   private responder: AdaptiveResponder;
+  private policy?: AegisPolicy;
   private intervalId: any = null;
 
-  constructor(responder: AdaptiveResponder) {
+  constructor(responder: AdaptiveResponder, policy?: AegisPolicy) {
     this.responder = responder;
+    this.policy = policy;
   }
 
   public startMonitoring(intervalMs = 1000): void {
@@ -17,6 +20,7 @@ export class Sentinel {
     this.intervalId = setInterval(() => {
       this.checkDevToolsTiming();
       this.checkNativeHooks();
+      this.checkConsoleHooks();
     }, intervalMs);
   }
 
@@ -28,16 +32,12 @@ export class Sentinel {
 
   private checkDevToolsTiming(): void {
     const start = performance.now();
-    // Debugger statement causes delay if DevTools is open and paused/breakpoint hit
-    // or timing anomaly detected
-    // Note: We use eval('debugger') to avoid static code stripping
     try {
       Function('debugger')();
     } catch (_) {}
     const end = performance.now();
 
     if (end - start > 100) {
-      // DevTools breakpoint / debugger open detected
       this.responder.triggerLevel2StateLock();
     }
   }
@@ -45,9 +45,25 @@ export class Sentinel {
   private checkNativeHooks(): void {
     if (typeof HTMLDivElement === 'undefined') return;
 
+    // Check if extensions in whitelist exist
+    if (this.policy && this.policy.whitelisted_extensions.length > 0) {
+      const currentScript = document.currentScript as HTMLScriptElement;
+      if (currentScript && this.policy.whitelisted_extensions.some(ext => currentScript.src.includes(ext))) {
+        return; // Whitelisted extension
+      }
+    }
+
     const nativeRemoveChild = HTMLDivElement.prototype.removeChild.toString();
-    if (!nativeRemoveChild.includes('[native code]')) {
-      // Prototype hook detected
+    if (!nativeRemoveChild.includes('[native code]') && !nativeRemoveChild.includes('native')) {
+      this.responder.triggerLevel1Honeypot();
+    }
+  }
+
+  private checkConsoleHooks(): void {
+    if (typeof console === 'undefined') return;
+
+    const nativeLog = console.log.toString();
+    if (!nativeLog.includes('[native code]') && !nativeLog.includes('native')) {
       this.responder.triggerLevel1Honeypot();
     }
   }

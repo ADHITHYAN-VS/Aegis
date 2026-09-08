@@ -40,8 +40,7 @@ export async function sha256(data: string): Promise<string> {
 }
 
 /**
- * Branchless environmental live key derivation.
- * Uses bitwise arithmetic and default object fallbacks to avoid logic branches.
+ * Branchless environmental live key derivation with dynamic session salting.
  */
 export function deriveLiveKeyFromEnv(): number {
   const isDocPresent = Number(typeof globalThis.document !== 'undefined');
@@ -63,9 +62,21 @@ export function deriveLiveKeyFromEnv(): number {
   const apiConcat = fetchStr + addEvtStr + appendChildStr;
   const apiSeed = fnv1a32(apiConcat);
 
+  let sessionSalt = 0x1337c0de;
+  if (typeof globalThis.sessionStorage !== 'undefined') {
+    let existingSalt = globalThis.sessionStorage.getItem('__aegis_salt__');
+    if (!existingSalt) {
+      existingSalt = String(Math.floor(Math.random() * 0xFFFFFFFF));
+      try {
+        globalThis.sessionStorage.setItem('__aegis_salt__', existingSalt);
+      } catch (_) {}
+    }
+    sessionSalt = fnv1a32(existingSalt);
+  }
+
   const errCls = globalThis.Error || { stackTraceLimit: 10 };
   const stackLimit = errCls.stackTraceLimit || 10;
-  const stackSeed = (stackLimit ^ 0x55aa55aa) >>> 0;
+  const stackSeed = (stackLimit ^ sessionSalt) >>> 0;
 
   return ((domSeed ^ apiSeed) + Math.imul(stackSeed, 0x9e3779b1)) >>> 0;
 }
