@@ -31,6 +31,9 @@ jobs:
         run: |
           ! grep -E "\b(if|switch)\b|\?|===" packages/runtime/src/verifier.ts
 
+      - name: Build core package first for type declaration resolution
+        run: pnpm --filter @aegis/core build
+
       - name: Run typecheck
         run: pnpm typecheck
 
