@@ -1,0 +1,16 @@
+{
+  "name": "aegis-monorepo",
+  "private": true,
+  "scripts": {
+    "build": "pnpm --filter @aegis/core build && pnpm --filter @aegis/runtime build && pnpm --filter @aegis/compiler build",
+    "test": "vitest run",
+    "typecheck": "pnpm --recursive run typecheck"
+  },
+  "devDependencies": {
+    "@types/node": "^26.5.0",
+    "happy-dom": "^13.3.8",
+    "tsup": "^8.0.2",
+    "typescript": "^5.3.3",
+    "vitest": "^1.3.1"
+  }
+}
