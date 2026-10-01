@@ -1,0 +1,12 @@
+{
+  "name": "@aegis/example-binance-cgt-bot",
+  "version": "1.0.0",
+  "private": true,
+  "main": "run.ts",
+  "scripts": {
+    "start": "tsx run.ts"
+  },
+  "dependencies": {
+    "@aegis/core": "workspace:*"
+  }
+}
