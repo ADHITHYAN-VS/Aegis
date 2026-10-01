@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AegisVM } from '../src/vm';
 import { BranchlessVerifier } from '../src/verifier';
@@ -5,70 +6,94 @@ import { AdaptiveResponder } from '../src/responder';
 import { maskInstructionsWithKey, unmaskInstructionWithKey } from '@aegis/core';
 
 describe('@aegis/runtime - AegisVM', () => {
-  let mockPolicy: any;
+  let verifier: BranchlessVerifier;
+  let responder: AdaptiveResponder;
 
   beforeEach(() => {
-    mockPolicy = {
+    document.body.innerHTML = '<div id="aegis-root"><span>Test DOM</span></div>';
+    verifier = new BranchlessVerifier();
+    responder = new AdaptiveResponder({
       level1_honeypot: true,
       level2_lock: true,
       level3_selfdestruct: false,
-      whitelisted_extensions: [],
-    };
-    // Reset DOM for tests
-    document.body.innerHTML = '<div id="aegis-root">Test</div>';
+      whitelisted_extensions: []
+    });
   });
 
   it('should execute simple arithmetic (PUSH, ADD, POP, RET) correctly', () => {
-    // Program: PUSH 5, PUSH 3, ADD, RET (expect 8)
-    // Encoded with a known key (we use a fixed key for testing)
-    const testKey = 0xAA;
-    const rawInstructions = new Uint8Array([0x01, 0x05, 0x01, 0x03, 0x03, 0x06]);
-    const encrypted = maskInstructionsWithKey(rawInstructions, testKey);
+    const liveKey = verifier.deriveLiveKey();
+    const opcodeMap = { PUSH: 1, ADD: 2, POP: 3, RET: 4 };
 
-    // Mock the verifier to return our test key
-    const mockVerifier = BranchlessVerifier.getInstance();
-    vi.spyOn(mockVerifier, 'deriveLiveKeyFromEnv').mockReturnValue(testKey);
+    const rawInstructions = [
+      { opcode: opcodeMap['PUSH'], arg: 5 },
+      { opcode: opcodeMap['PUSH'], arg: 3 },
+      { opcode: opcodeMap['ADD'] },
+      { opcode: opcodeMap['RET'] }
+    ];
 
-    const vm = new AegisVM(encrypted, mockPolicy);
-    const result = vm.execute();
+    const maskedInstructions = maskInstructionsWithKey(rawInstructions, liveKey);
+    const chunk = {
+      version: '1.0.0',
+      buildSeed: 'test-seed',
+      opcodeMap,
+      instructions: maskedInstructions,
+      constants: []
+    };
+
+    const vm = new AegisVM(responder);
+    const result = vm.execute(chunk);
 
     expect(result).toBe(8);
   });
 
-  it('should trigger AdaptiveResponder Level 2 when instruction decryption fails (tampered environment)', () => {
-    // Program: PUSH 1, RET
-    const rawInstructions = new Uint8Array([0x01, 0x01, 0x06]);
-    const correctKey = 0xAA;
-    const tamperedKey = 0xBB; // Different key = wrong environment
+  it('should trigger AdaptiveResponder Level 1 honeypot when instruction decryption fails (tampered environment)', () => {
+    const liveKey = verifier.deriveLiveKey();
+    const opcodeMap = { PUSH: 1, RET: 2 };
 
-    const encrypted = maskInstructionsWithKey(rawInstructions, correctKey);
+    const rawInstructions = [
+      { opcode: opcodeMap['PUSH'], arg: 1 },
+      { opcode: opcodeMap['RET'] }
+    ];
 
-    // Mock the verifier to return the WRONG key (simulating DOM tampering)
-    const mockVerifier = BranchlessVerifier.getInstance();
-    vi.spyOn(mockVerifier, 'deriveLiveKeyFromEnv').mockReturnValue(tamperedKey);
+    // Mask with wrong key to simulate unmasking failure
+    const maskedInstructions = maskInstructionsWithKey(rawInstructions, liveKey + 123);
+    const chunk = {
+      version: '1.0.0',
+      buildSeed: 'test-seed',
+      opcodeMap,
+      instructions: maskedInstructions,
+      constants: []
+    };
 
-    // Spy on the responder
-    const responder = AdaptiveResponder.getInstance();
-    const level2Spy = vi.spyOn(responder, 'triggerLevel2');
+    const honeypotSpy = vi.spyOn(responder, 'triggerLevel1Honeypot');
 
-    const vm = new AegisVM(encrypted, mockPolicy);
-    vm.execute();
+    const vm = new AegisVM(responder);
+    const result = vm.execute(chunk);
 
-    expect(level2Spy).toHaveBeenCalled();
+    expect(result).toBeNull();
+    expect(honeypotSpy).toHaveBeenCalled();
   });
 
   it('should handle HALT opcode gracefully', () => {
-    // Program: HALT
-    const rawInstructions = new Uint8Array([0x0B]);
-    const key = 0xAA;
-    const encrypted = maskInstructionsWithKey(rawInstructions, key);
+    const liveKey = verifier.deriveLiveKey();
+    const opcodeMap = { HALT: 99 };
 
-    const mockVerifier = BranchlessVerifier.getInstance();
-    vi.spyOn(mockVerifier, 'deriveLiveKeyFromEnv').mockReturnValue(key);
+    const rawInstructions = [
+      { opcode: opcodeMap['HALT'] }
+    ];
 
-    const vm = new AegisVM(encrypted, mockPolicy);
-    const result = vm.execute();
+    const maskedInstructions = maskInstructionsWithKey(rawInstructions, liveKey);
+    const chunk = {
+      version: '1.0.0',
+      buildSeed: 'test-seed',
+      opcodeMap,
+      instructions: maskedInstructions,
+      constants: []
+    };
 
-    expect(result).toBeUndefined(); // HALT returns nothing
+    const vm = new AegisVM(responder);
+    const result = vm.execute(chunk);
+
+    expect(result).toBeUndefined(); // HALT with empty stack returns undefined
   });
 });
